@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="为指定 Base 钱包强制补入少量 ETH，以支付 EIP-7702 撤销费用。">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230052ff'/%3E%3Cpath d='M17 22h30v7H17zm0 13h20v7H17z' fill='white'/%3E%3C/svg%3E">
+  <title>朋友的 Base 钱包恢复 - 强制补 Gas</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: #f4f6f8;
+      color: #17202a;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #f4f6f8;
+    }
+
+    header {
+      background: #ffffff;
+      border-bottom: 1px solid #dfe4ea;
+    }
+
+    .header-inner,
+    main {
+      width: min(760px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .header-inner {
+      min-height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .network {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #4d5b6a;
+    }
+
+    .network::before {
+      content: "";
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #1769e0;
+    }
+
+    main {
+      padding: 32px 0 48px;
+    }
+
+    .notice {
+      border-left: 4px solid #d97706;
+      background: #fff8e8;
+      padding: 14px 16px;
+      font-size: 14px;
+      line-height: 1.65;
+      margin-bottom: 24px;
+    }
+
+    .section {
+      padding: 22px 0;
+      border-bottom: 1px solid #dfe4ea;
+    }
+
+    .section:first-of-type { padding-top: 0; }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    dl {
+      margin: 0;
+      display: grid;
+      grid-template-columns: 132px minmax(0, 1fr);
+      gap: 10px 18px;
+      font-size: 14px;
+    }
+
+    dt { color: #687585; }
+    dd { margin: 0; min-width: 0; }
+
+    code {
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+      color: #273444;
+    }
+
+    .status {
+      min-height: 48px;
+      padding: 12px 14px;
+      border: 1px solid #cad2dc;
+      background: #ffffff;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .status.ok { border-color: #16845b; background: #edf9f4; }
+    .status.error { border-color: #c93d4a; background: #fff1f2; }
+    .status.busy { border-color: #1769e0; background: #eff6ff; }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    button {
+      min-height: 42px;
+      border: 1px solid #1769e0;
+      border-radius: 6px;
+      padding: 0 18px;
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+      background: #1769e0;
+      color: #ffffff;
+    }
+
+    button.secondary {
+      background: #ffffff;
+      color: #1769e0;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.48;
+    }
+
+    label.confirm {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 16px;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin: 2px 0 0;
+      accent-color: #1769e0;
+      flex: 0 0 auto;
+    }
+
+    ol {
+      margin: 0;
+      padding-left: 22px;
+      font-size: 14px;
+      line-height: 1.75;
+    }
+
+    a { color: #075fc2; }
+
+    .small {
+      margin: 12px 0 0;
+      color: #687585;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 560px) {
+      .header-inner { align-items: flex-start; flex-direction: column; padding: 14px 0; }
+      main { padding-top: 24px; }
+      dl { grid-template-columns: 1fr; gap: 5px; }
+      dd { margin-bottom: 8px; }
+      .actions { flex-direction: column; }
+      button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>朋友的 Base 钱包恢复</h1>
+      <span class="network">Base Mainnet</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="notice">
+      此页面仅为下方这个指定的钱包恢复使用，固定向问题地址强制写入 <strong>0.00005 ETH</strong>，用于支付一次 EIP-7702 撤销费用。
+      请只连接另一个干净钱包。页面不会读取助记词或私钥，也不会向任何服务器上传钱包数据。
+    </div>
+
+    <section class="section">
+      <h2>操作参数</h2>
+      <dl>
+        <dt>问题地址</dt>
+        <dd><code id="target"></code></dd>
+        <dt>当前异常委托</dt>
+        <dd><code id="delegation"></code></dd>
+        <dt>强制转入金额</dt>
+        <dd>0.00005 ETH</dd>
+        <dt>实现方式</dt>
+        <dd>一次性合约创建并执行 SELFDESTRUCT，不调用问题地址的代理代码</dd>
+      </dl>
+    </section>
+
+    <section class="section">
+      <h2>连接干净钱包</h2>
+      <div class="status" id="status" role="status">尚未连接 MetaMask。</div>
+      <div class="actions">
+        <button id="connect">连接 MetaMask</button>
+        <button id="refresh" class="secondary" disabled>重新检查</button>
+      </div>
+      <label class="confirm">
+        <input id="confirm" type="checkbox" disabled>
+        <span>我确认当前连接的是干净钱包，不是问题地址；我会在补入后立即切换回问题钱包关闭 Base 智能账户。</span>
+      </label>
+      <div class="actions">
+        <button id="send" disabled>强制转入 0.00005 ETH</button>
+      </div>
+      <p class="small">MetaMask 最终确认窗口应显示“合约部署/合约创建”和 0.00005 ETH。若收款地址、金额或网络不一致，请拒绝交易。</p>
+    </section>
+
+    <section class="section">
+      <h2>到账后的操作</h2>
+      <ol>
+        <li>在 MetaMask 中切换回问题地址。</li>
+        <li>保持 Base 网络，打开账户菜单中的“智能账户”。</li>
+        <li>关闭 Base 开关并确认交易。</li>
+        <li>交易确认后，在区块浏览器检查该地址代码是否已清空。</li>
+      </ol>
+      <p class="small">不要重复补款。若第一次交易已上链但余额很快消失，请停止操作并记录交易哈希。</p>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+
+    const TARGET = "0x480A43f06b821199506eC38f1fcDCF1aeF066062";
+    const EXPECTED_CODE = "0xef010062c9c948acb8a47f95a23ed283e5caab628e9af0";
+    const BASE_CHAIN_ID = "0x2105";
+    const VALUE_WEI = 50000000000000n;
+    const INIT_CODE = `0x73${TARGET.slice(2).toLowerCase()}ff`;
+
+    const targetEl = document.querySelector("#target");
+    const delegationEl = document.querySelector("#delegation");
+    const statusEl = document.querySelector("#status");
+    const connectButton = document.querySelector("#connect");
+    const refreshButton = document.querySelector("#refresh");
+    const confirmBox = document.querySelector("#confirm");
+    const sendButton = document.querySelector("#send");
+
+    let selectedAccount = null;
+    let checksPassed = false;
+    let submitted = false;
+
+    targetEl.textContent = TARGET;
+    delegationEl.textContent = EXPECTED_CODE;
+
+    function setStatus(message, kind = "") {
+      statusEl.textContent = message;
+      statusEl.className = `status ${kind}`.trim();
+    }
+
+    function shortAddress(address) {
+      return `${address.slice(0, 8)}…${address.slice(-6)}`;
+    }
+
+    function updateSendState() {
+      sendButton.disabled = !checksPassed || !confirmBox.checked || submitted;
+    }
+
+    async function switchToBase() {
+      const chainId = await window.ethereum.request({ method: "eth_chainId" });
+      if (chainId === BASE_CHAIN_ID) return;
+
+      try {
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: BASE_CHAIN_ID }]
+        });
+      } catch (error) {
+        if (error.code !== 4902) throw error;
+        await window.ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [{
+            chainId: BASE_CHAIN_ID,
+            chainName: "Base Mainnet",
+            nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+            rpcUrls: ["https://mainnet.base.org"],
+            blockExplorerUrls: ["https://basescan.org"]
+          }]
+        });
+      }
+    }
+
+    async function runChecks() {
+      checksPassed = false;
+      confirmBox.checked = false;
+      confirmBox.disabled = true;
+      updateSendState();
+      setStatus("正在核对网络、账户、余额和目标地址状态…", "busy");
+
+      await switchToBase();
+      const accounts = await window.ethereum.request({ method: "eth_accounts" });
+      if (!accounts.length) throw new Error("MetaMask 未返回已连接账户。");
+
+      selectedAccount = accounts[0];
+      if (selectedAccount.toLowerCase() === TARGET.toLowerCase()) {
+        throw new Error("当前连接的是问题地址。请先在 MetaMask 切换到另一个干净钱包。不能用问题地址执行补款。");
+      }
+
+      const [balanceHex, targetCode] = await Promise.all([
+        window.ethereum.request({
+          method: "eth_getBalance",
+          params: [selectedAccount, "latest"]
+        }),
+        window.ethereum.request({
+          method: "eth_getCode",
+          params: [TARGET, "latest"]
+        })
+      ]);
+
+      const balanceWei = BigInt(balanceHex);
+      if (targetCode.toLowerCase() !== EXPECTED_CODE) {
+        throw new Error("问题地址的链上委托状态已经发生变化。为防止误转，页面已停止操作。");
+      }
+      if (balanceWei <= VALUE_WEI) {
+        throw new Error("干净钱包的 Base ETH 不足以覆盖 0.00005 ETH 和部署 Gas。请至少准备约 0.0001 ETH。");
+      }
+
+      checksPassed = true;
+      confirmBox.disabled = false;
+      refreshButton.disabled = false;
+      setStatus(`检查通过。当前干净钱包：${shortAddress(selectedAccount)}。请勾选确认后提交。`, "ok");
+      updateSendState();
+    }
+
+    async function connect() {
+      if (!window.ethereum) {
+        setStatus("未检测到 MetaMask。请在安装了 MetaMask 的 Chrome 或 Edge 中打开此页面。", "error");
+        return;
+      }
+
+      try {
+        setStatus("等待 MetaMask 连接…", "busy");
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        await runChecks();
+      } catch (error) {
+        setStatus(error.message || "连接失败。", "error");
+      }
+    }
+
+    async function waitForReceipt(hash) {
+      for (let attempt = 0; attempt < 90; attempt += 1) {
+        const receipt = await window.ethereum.request({
+          method: "eth_getTransactionReceipt",
+          params: [hash]
+        });
+        if (receipt) return receipt;
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      return null;
+    }
+
+    async function sendForcedEth() {
+      if (!checksPassed || !confirmBox.checked || submitted) return;
+
+      submitted = true;
+      updateSendState();
+      setStatus("请在 MetaMask 中核对：Base 网络、合约创建、金额 0.00005 ETH。", "busy");
+
+      try {
+        const hash = await window.ethereum.request({
+          method: "eth_sendTransaction",
+          params: [{
+            from: selectedAccount,
+            value: `0x${VALUE_WEI.toString(16)}`,
+            data: INIT_CODE
+          }]
+        });
+
+        setStatus(`交易已提交：${hash}。正在等待确认，请不要再次点击。`, "busy");
+        const receipt = await waitForReceipt(hash);
+        if (!receipt) {
+          setStatus(`交易仍在等待确认。请在 BaseScan 查看：${hash}`, "busy");
+          return;
+        }
+        if (receipt.status !== "0x1") {
+          throw new Error(`强制补款交易执行失败：${hash}`);
+        }
+
+        const balanceHex = await window.ethereum.request({
+          method: "eth_getBalance",
+          params: [TARGET, "latest"]
+        });
+        const balance = Number(BigInt(balanceHex)) / 1e18;
+        setStatus(`补款成功，问题地址当前约有 ${balance.toFixed(8)} ETH。请立即切换回问题钱包并关闭 Base 智能账户。交易：${hash}`, "ok");
+        window.open(`https://basescan.org/tx/${hash}`, "_blank", "noopener,noreferrer");
+      } catch (error) {
+        submitted = false;
+        updateSendState();
+        setStatus(error.message || "交易未完成。", "error");
+      }
+    }
+
+    connectButton.addEventListener("click", connect);
+    refreshButton.addEventListener("click", () => runChecks().catch(error => setStatus(error.message, "error")));
+    confirmBox.addEventListener("change", updateSendState);
+    sendButton.addEventListener("click", sendForcedEth);
+
+    if (window.ethereum) {
+      window.ethereum.on("accountsChanged", () => {
+        selectedAccount = null;
+        checksPassed = false;
+        confirmBox.checked = false;
+        confirmBox.disabled = true;
+        refreshButton.disabled = true;
+        submitted = false;
+        updateSendState();
+        setStatus("账户已切换，请重新连接并检查。", "");
+      });
+      window.ethereum.on("chainChanged", () => window.location.reload());
+    }
+  </script>
+</body>
+</html>
